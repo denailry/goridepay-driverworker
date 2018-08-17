@@ -7,29 +7,35 @@ import (
 )
 
 type Worker struct {
-	DriverId       int
-	orderQueue     []*common.Order
+	DriverID       int
 	ready          bool
-	orderPending   []*common.Order
 	isPrioritizing bool
-	pendingLock    sync.Mutex
-	queueLock      sync.Mutex
+	orderQueue     []*common.Order
+	orderPending   []*common.Order
+	pendingLock    *sync.Mutex
+	queueLock      *sync.Mutex
 }
 
 var workerList = make([]*Worker, common.MaxWorker)
 
-func AddOrder(driverId int, order common.Order) {
-	w := NewWorker(driverId)
+func AddOrder(driverID int, order common.Order) {
+	w := NewWorker(driverID)
 	w.queue(order)
 }
 
-func NewWorker(driverId int) *Worker {
-	if workerList[driverId] == nil {
-		w := Worker{DriverId: driverId, ready: true}
+func NewWorker(driverID int) *Worker {
+	if workerList[driverID] == nil {
+		w := Worker{
+			DriverID:       driverID,
+			ready:          true,
+			isPrioritizing: false,
+			pendingLock:    &sync.Mutex{},
+			queueLock:      &sync.Mutex{},
+		}
 		go w.startOfferingDriver()
 		return &w
 	}
-	return workerList[driverId]
+	return workerList[driverID]
 }
 
 func (d Worker) startOfferingDriver() {
@@ -77,7 +83,7 @@ func (d Worker) insert(idx int, order common.Order) {
 func (d Worker) prioritize() {
 	d.isPrioritizing = true
 	for d.ready && len(d.orderPending) > 0 {
-		order := pop(&d.pendingLock, &d.orderPending)
+		order := pop(d.pendingLock, &d.orderPending)
 		if len(d.orderQueue) == 0 {
 			d.insert(-1, order)
 		} else {

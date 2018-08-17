@@ -20,29 +20,29 @@ import (
 
 var port = os.Args[1]
 
-type order_model struct {
-	Order_id   string
-	Driver_ids []string
+type orderModel struct {
+	OrderID   string
+	DriverIds []string
 }
 
-type order_response struct {
+type orderResponse struct {
 	Error   bool
 	Message string
 }
 
-func OrderHandler(w http.ResponseWriter, r *http.Request) {
+func orderHandler(w http.ResponseWriter, r *http.Request) {
 	s, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(s))
-	fmt.Printf("--> %s\n\n", r)
+	fmt.Printf("--> %s\n\n", r.Body)
 	log.Println(s)
 	decoder := json.NewDecoder(r.Body)
-	var t order_model
+	var t orderModel
 	err := decoder.Decode(&t)
 	if err != nil {
 		panic(err)
 	}
-	log.Println("Order ID: " + t.Driver_ids[0])
-	or := order_response{
+	log.Println("Order ID: " + t.DriverIds[0])
+	or := orderResponse{
 		false,
 		"ok",
 	}
@@ -60,7 +60,7 @@ func main() {
 	flag.Parse()
 
 	r := mux.NewRouter()
-	r.HandleFunc("/order", OrderHandler).Methods("POST")
+	r.HandleFunc("/order", orderHandler).Methods("POST")
 	http.Handle("/", r)
 	// Add your routes as needed
 
