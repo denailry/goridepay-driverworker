@@ -36,8 +36,8 @@ func orderHandler(w http.ResponseWriter, r *http.Request) {
 		worker.AddOrder(driverData.DriverID, o)
 	}
 	or := model.OrderResponse{
-		false,
-		"ok",
+		Error:   false,
+		Message: "ok",
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
