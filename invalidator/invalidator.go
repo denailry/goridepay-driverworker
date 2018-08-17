@@ -41,10 +41,11 @@ func run() {
 		i := 0
 		for i < len(InvalidOrderList) {
 			order := InvalidOrderList[i]
-			if order.Timestamp-time.Now().Unix() > common.MaxOrderWaitingTime {
+			if order.Timestamp-time.Now().Unix() >= common.MaxOrderWaitingTime {
 				InvalidOrderList = append(InvalidOrderList[:i], InvalidOrderList[i+1:]...)
+			} else {
+				i++
 			}
-			i++
 		}
 		listLock.Unlock()
 		time.Sleep(common.MaxOrderWaitingTime * time.Second)

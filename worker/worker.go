@@ -143,7 +143,7 @@ func pop(lock *sync.Mutex, pq *[]*order.Order) order.Order {
 
 func (d Worker) insert(idx int, order order.Order) {
 	d.queueLock.Lock()
-	if idx == -1 {
+	if idx >= len(d.orderQueue) {
 		d.orderQueue = append(d.orderQueue, &order)
 	} else {
 		temp := append(d.orderQueue[:idx], &order)
@@ -169,25 +169,30 @@ func (d Worker) prioritize() {
 }
 
 func findSmallerIndex(q []*order.Order, o order.Order) int {
-	i := 0
+	i := len(q) - 1
 	result := -1
-	for result != -1 && i < len(q) {
+	for result != -1 && i >= 0 {
 		c := *q[i]
 		if c.OriginDistance < o.OriginDistance {
 			result = i
 		} else {
-			i++
+			i--
 		}
 	}
-	return result
+	return result + 1
 }
 
 func (d Worker) pushNotification() bool {
 	order := pop(d.queueLock, &d.orderQueue)
-	valid := invalidator.IsValid(order.Info.OrderID)
+	valid := isValid(*order.Info)
 	if valid {
 		// Push notification
 		d.previosOrderID = order.Info.OrderID
 	}
 	return valid
+}
+
+func isValid(orderInfo order.Info) bool {
+	return orderInfo.Timestamp-time.Now().Unix() < common.MaxOrderWaitingTime &&
+		invalidator.IsValid(orderInfo.OrderID)
 }

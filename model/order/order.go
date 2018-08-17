@@ -14,4 +14,5 @@ type Info struct {
 	OrderID     int
 	Origin      string
 	Destination string
+	Timestamp   int64
 }

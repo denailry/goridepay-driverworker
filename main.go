@@ -32,6 +32,7 @@ func orderHandler(w http.ResponseWriter, r *http.Request) {
 		OrderID:     request.OrderID,
 		Origin:      request.Origin,
 		Destination: request.Destination,
+		Timestamp:   time.Now().Unix(),
 	}
 	for _, driverData := range request.DriverData {
 		o := order.Order{
@@ -62,10 +63,6 @@ func acceptHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(re.ToJSON())
-}
-
-func cancelHandler(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func invalidateHandler(w http.ResponseWriter, r *http.Request) {
