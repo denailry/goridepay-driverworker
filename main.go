@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"goridepay-driverworker/common"
+	"goridepay-driverworker/model/accept"
 	"goridepay-driverworker/model/common"
 	"goridepay-driverworker/model/order"
 	"goridepay-driverworker/model/reject"
@@ -47,7 +48,18 @@ func orderHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func acceptHandler(w http.ResponseWriter, r *http.Request) {
+	request := accept.NewRequest(r.Body)
+	var re response.Response
+	if worker.AcceptOrder(request.DriverID, request.OrderID) {
+		re.Error = false
+		re.Message = "ok"
 
+	} else {
+		re.Error = true
+		re.Message = "Order has been taken or cancelled."
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(re.ToJSON())
 }
 
 func cancelHandler(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +75,7 @@ func rejectHandler(w http.ResponseWriter, r *http.Request) {
 
 	} else {
 		re.Error = true
-		re.Message = "Order ID is not valid to be rejected"
+		re.Message = "Order ID is not valid to be rejected."
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(re.ToJSON())

@@ -15,11 +15,15 @@ type Worker struct {
 	DriverID       int
 	ready          bool
 	isPrioritizing bool
+	isOffering     bool
+	isNotifying    bool
+	isConfirming   bool
 	orderQueue     []*order.Order
 	orderPending   []*order.Order
 	pendingLock    *sync.Mutex
 	queueLock      *sync.Mutex
-	rejectChannel  chan bool
+	rejectChan     chan bool
+	confirmChan    chan bool
 	previosOrderID int
 }
 
@@ -40,10 +44,27 @@ func AddOrder(driverID int, order order.Order) {
 func RejectOrder(driverID int, orderID int) bool {
 	w := NewWorker(driverID)
 	if orderID == w.previosOrderID {
-		w.rejectChannel <- true
+		w.rejectChan <- true
 		return true
 	}
 	return false
+}
+
+// AcceptOrder is official way to accept order for certain driver
+func AcceptOrder(driverID int, orderID int) bool {
+	w := NewWorker(driverID)
+	if orderID == w.previosOrderID && !w.isNotifying {
+		w.isConfirming = true
+		w.confirmChan <- confirmOrder(orderID)
+		w.isConfirming = false
+		return true
+	}
+	return false
+}
+
+func confirmOrder(orderID int) bool {
+	// Confirm the order wheter it is taken or not
+	return true
 }
 
 // NewWorker return worker stored in workerList or create the new one if worker pointer is nil
@@ -53,32 +74,51 @@ func NewWorker(driverID int) *Worker {
 			DriverID:       driverID,
 			ready:          true,
 			isPrioritizing: false,
+			isOffering:     false,
+			isNotifying:    false,
+			isConfirming:   false,
 			pendingLock:    &sync.Mutex{},
 			queueLock:      &sync.Mutex{},
-			rejectChannel:  make(chan bool),
+			rejectChan:     make(chan bool),
+			confirmChan:    make(chan bool),
 			previosOrderID: -1,
 		}
-		go w.startOfferingDriver()
 		return &w
 	}
 	return workerList[getWorkerIndex(driverID)]
 }
 
 func (d Worker) startOfferingDriver() {
+	d.isOffering = true
 	for d.ready && len(d.orderQueue) > 0 {
-		go d.pushNotification()
+		if d.isConfirming {
+			accepted := <-d.confirmChan
+			if accepted {
+				d.ready = false
+				d.orderQueue = nil
+				break
+			}
+		}
+		d.pushNotification()
+		d.isNotifying = false
 		select {
-		case <-d.rejectChannel:
+		case <-d.rejectChan:
 		case <-time.After(5000 * time.Millisecond):
 		}
+		d.isNotifying = true
 		if !d.ready {
 			d.orderQueue = nil
 		}
 	}
+	d.isNotifying = false
+	d.isOffering = false
 }
 
 func (d Worker) queue(order order.Order) {
 	if d.ready {
+		if !d.isOffering {
+			go d.startOfferingDriver()
+		}
 		d.pendingLock.Lock()
 		d.orderPending = append(d.orderPending, &order)
 		d.pendingLock.Unlock()
