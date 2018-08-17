@@ -8,12 +8,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"time"
 
 	"goridepay-driverworker/common"
+	"goridepay-driverworker/invalidator"
 	"goridepay-driverworker/model/accept"
 	"goridepay-driverworker/model/common"
+	"goridepay-driverworker/model/invalidate"
 	"goridepay-driverworker/model/order"
 	"goridepay-driverworker/model/reject"
 	"goridepay-driverworker/worker"
@@ -53,7 +56,6 @@ func acceptHandler(w http.ResponseWriter, r *http.Request) {
 	if worker.AcceptOrder(request.DriverID, request.OrderID) {
 		re.Error = false
 		re.Message = "ok"
-
 	} else {
 		re.Error = true
 		re.Message = "Order has been taken or cancelled."
@@ -66,13 +68,24 @@ func cancelHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func invalidateHandler(w http.ResponseWriter, r *http.Request) {
+	request := invalidate.NewRequest(r.Body)
+	invalidOrder := invalidate.NewInvalidOrder(request.OrderID)
+	go invalidator.Invalidate(invalidOrder)
+	re := response.Response{
+		Error:   false,
+		Message: "ok",
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(re.ToJSON())
+}
+
 func rejectHandler(w http.ResponseWriter, r *http.Request) {
 	request := reject.NewRequest(r.Body)
 	var re response.Response
 	if worker.RejectOrder(request.DriverID, request.OrderID) {
 		re.Error = false
 		re.Message = "ok"
-
 	} else {
 		re.Error = true
 		re.Message = "Order ID is not valid to be rejected."
@@ -86,6 +99,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	runtime.GOMAXPROCS(128)
 	common.ServiceId, _ = strconv.Atoi(os.Args[2])
 
 	var wait time.Duration
@@ -97,6 +111,7 @@ func main() {
 	r.HandleFunc("/accept", acceptHandler).Methods("POST")
 	r.HandleFunc("/cancel", cancelHandler).Methods("POST")
 	r.HandleFunc("/reject", rejectHandler).Methods("POST")
+	r.HandleFunc("/invalidate", rejectHandler).Methods("POST")
 	r.HandleFunc("/", homeHandler).Methods("GET")
 	http.Handle("/", r)
 

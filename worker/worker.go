@@ -2,6 +2,7 @@ package worker
 
 import (
 	"goridepay-driverworker/common"
+	"goridepay-driverworker/invalidator"
 	"goridepay-driverworker/model/order"
 	"sync"
 	"time"
@@ -99,13 +100,15 @@ func (d Worker) startOfferingDriver() {
 				break
 			}
 		}
-		d.pushNotification()
-		d.isNotifying = false
-		select {
-		case <-d.rejectChan:
-		case <-time.After(5000 * time.Millisecond):
+		success := d.pushNotification()
+		if success {
+			d.isNotifying = false
+			select {
+			case <-d.rejectChan:
+			case <-time.After(5000 * time.Millisecond):
+			}
+			d.isNotifying = true
 		}
-		d.isNotifying = true
 		if !d.ready {
 			d.orderQueue = nil
 		}
@@ -179,8 +182,12 @@ func findSmallerIndex(q []*order.Order, o order.Order) int {
 	return result
 }
 
-func (d Worker) pushNotification() {
+func (d Worker) pushNotification() bool {
 	order := pop(d.queueLock, &d.orderQueue)
-	// Push notification
-	d.previosOrderID = order.Info.OrderID
+	valid := invalidator.IsValid(order.Info.OrderID)
+	if valid {
+		// Push notification
+		d.previosOrderID = order.Info.OrderID
+	}
+	return valid
 }
