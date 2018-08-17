@@ -2,29 +2,40 @@ package worker
 
 import (
 	"goridepay-driverworker/common"
+	"goridepay-driverworker/model"
 	"sync"
 	"time"
 )
 
+// Worker is responsible for:
+//   - queueing orders coming for driver
+//   - sending order notification to driver by taking the nearest originDestination first
+// It handles the threading, so queuing and notification process won't block the entire service
 type Worker struct {
 	DriverID       int
 	ready          bool
 	isPrioritizing bool
-	orderQueue     []*common.Order
-	orderPending   []*common.Order
+	orderQueue     []*model.Order
+	orderPending   []*model.Order
 	pendingLock    *sync.Mutex
 	queueLock      *sync.Mutex
 }
 
+// Always use getWorkerIndex to get element from workerList
 var workerList = make([]*Worker, common.MaxWorker)
 
-func AddOrder(driverID int, order common.Order) {
-	w := NewWorker(driverID)
+func getWorkerIndex(driverID int) int {
+	return (driverID % common.MaxWorker) + 1
+}
+
+// AddOrder is official way to add order to certain driver
+func AddOrder(driverID int, order model.Order) {
+	w := newWorker(driverID)
 	w.queue(order)
 }
 
-func NewWorker(driverID int) *Worker {
-	if workerList[driverID] == nil {
+func newWorker(driverID int) *Worker {
+	if workerList[getWorkerIndex(driverID)] == nil {
 		w := Worker{
 			DriverID:       driverID,
 			ready:          true,
@@ -35,7 +46,7 @@ func NewWorker(driverID int) *Worker {
 		go w.startOfferingDriver()
 		return &w
 	}
-	return workerList[driverID]
+	return workerList[getWorkerIndex(driverID)]
 }
 
 func (d Worker) startOfferingDriver() {
@@ -48,7 +59,7 @@ func (d Worker) startOfferingDriver() {
 	}
 }
 
-func (d Worker) queue(order common.Order) {
+func (d Worker) queue(order model.Order) {
 	if d.ready {
 		d.pendingLock.Lock()
 		d.orderPending = append(d.orderPending, &order)
@@ -59,7 +70,7 @@ func (d Worker) queue(order common.Order) {
 	}
 }
 
-func pop(lock *sync.Mutex, pq *[]*common.Order) common.Order {
+func pop(lock *sync.Mutex, pq *[]*model.Order) model.Order {
 	lock.Lock()
 	q := *pq
 	order := *q[0]
@@ -69,7 +80,7 @@ func pop(lock *sync.Mutex, pq *[]*common.Order) common.Order {
 	return order
 }
 
-func (d Worker) insert(idx int, order common.Order) {
+func (d Worker) insert(idx int, order model.Order) {
 	d.queueLock.Lock()
 	if idx == -1 {
 		d.orderQueue = append(d.orderQueue, &order)
@@ -96,12 +107,12 @@ func (d Worker) prioritize() {
 	d.isPrioritizing = false
 }
 
-func findSmallerIndex(q []*common.Order, o common.Order) int {
+func findSmallerIndex(q []*model.Order, o model.Order) int {
 	i := 0
 	result := -1
 	for result != -1 && i < len(q) {
 		c := *q[i]
-		if c.Distance < o.Distance {
+		if c.OriginDistance < o.OriginDistance {
 			result = i
 		} else {
 			i++
