@@ -1,4 +1,4 @@
-package order
+package request
 
 import (
 	"bytes"
@@ -7,8 +7,8 @@ import (
 	"io/ioutil"
 )
 
-// Request is used to store data of request coming to orderHandler
-type Request struct {
+// Order is used to store data of request coming to orderHandler
+type Order struct {
 	OrderID     int
 	Origin      string
 	Destination string
@@ -21,12 +21,12 @@ type driverData struct {
 	DestinationDistance int
 }
 
-// NewRequest is constructor of order.Request which converts request body coming to orderHandler to order.Request
-func NewRequest(requestBody io.Reader) *Request {
+// NewOrder is constructor of request.Order which converts request body coming to orderHandler to request.Order
+func NewOrder(requestBody io.Reader) *Order {
 	s, _ := ioutil.ReadAll(requestBody)
 	requestBody = ioutil.NopCloser(bytes.NewBuffer(s))
 	decoder := json.NewDecoder(requestBody)
-	var t *Request
+	var t *Order
 	err := decoder.Decode(t)
 	if err != nil {
 		panic(err)

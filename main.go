@@ -14,11 +14,10 @@ import (
 
 	"goridepay-driverworker/common"
 	"goridepay-driverworker/invalidator"
-	"goridepay-driverworker/model/accept"
-	"goridepay-driverworker/model/common"
 	"goridepay-driverworker/model/invalidate"
 	"goridepay-driverworker/model/order"
-	"goridepay-driverworker/model/reject"
+	"goridepay-driverworker/model/request"
+	"goridepay-driverworker/model/response"
 	"goridepay-driverworker/worker"
 
 	"github.com/gorilla/mux"
@@ -27,7 +26,7 @@ import (
 var port = os.Args[1]
 
 func orderHandler(w http.ResponseWriter, r *http.Request) {
-	request := order.NewRequest(r.Body)
+	request := request.NewOrder(r.Body)
 	info := order.Info{
 		OrderID:     request.OrderID,
 		Origin:      request.Origin,
@@ -42,7 +41,7 @@ func orderHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		worker.AddOrder(driverData.DriverID, o)
 	}
-	response := response.Response{
+	response := response.Simple{
 		Error:   false,
 		Message: "ok",
 	}
@@ -52,8 +51,8 @@ func orderHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func acceptHandler(w http.ResponseWriter, r *http.Request) {
-	request := accept.NewRequest(r.Body)
-	var re response.Response
+	request := request.NewAccept(r.Body)
+	var re response.Simple
 	if worker.AcceptOrder(request.DriverID, request.OrderID) {
 		re.Error = false
 		re.Message = "ok"
@@ -65,11 +64,27 @@ func acceptHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(re.ToJSON())
 }
 
+func readyHandler(w http.ResponseWriter, r *http.Request) {
+	request := request.NewSimple(r.Body)
+	worker := worker.NewWorker(request.DriverID)
+	var re response.Simple
+	if worker.Ready {
+		re.Error = true
+		re.Message = "Worker is already in ready state"
+	} else {
+		re.Error = false
+		re.Message = "ok"
+		worker.Ready = true
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(re.ToJSON())
+}
+
 func invalidateHandler(w http.ResponseWriter, r *http.Request) {
-	request := invalidate.NewRequest(r.Body)
+	request := request.NewInvalidate(r.Body)
 	invalidOrder := invalidate.NewInvalidOrder(request.OrderID)
 	go invalidator.Invalidate(invalidOrder)
-	re := response.Response{
+	re := response.Simple{
 		Error:   false,
 		Message: "ok",
 	}
@@ -78,8 +93,8 @@ func invalidateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func rejectHandler(w http.ResponseWriter, r *http.Request) {
-	request := reject.NewRequest(r.Body)
-	var re response.Response
+	request := request.NewReject(r.Body)
+	var re response.Simple
 	if worker.RejectOrder(request.DriverID, request.OrderID) {
 		re.Error = false
 		re.Message = "ok"
@@ -106,7 +121,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/order", orderHandler).Methods("POST")
 	r.HandleFunc("/accept", acceptHandler).Methods("POST")
-	r.HandleFunc("/cancel", cancelHandler).Methods("POST")
+	r.HandleFunc("/ready", readyHandler).Methods("POST")
 	r.HandleFunc("/reject", rejectHandler).Methods("POST")
 	r.HandleFunc("/invalidate", rejectHandler).Methods("POST")
 	r.HandleFunc("/", homeHandler).Methods("GET")

@@ -1,4 +1,4 @@
-package reject
+package request
 
 import (
 	"bytes"
@@ -7,18 +7,18 @@ import (
 	"io/ioutil"
 )
 
-// Request is used to store data of request coming to rejectHandler
-type Request struct {
+// Reject is used to store data of request coming to rejectHandler
+type Reject struct {
 	DriverID int
 	OrderID  int
 }
 
-// NewRequest is constructor of reject.Request which converts request body coming to rejectHandler to reject.Request
-func NewRequest(requestBody io.Reader) *Request {
+// NewReject is constructor of request.Reject which converts request body coming to rejectHandler to request.Reject
+func NewReject(requestBody io.Reader) *Reject {
 	s, _ := ioutil.ReadAll(requestBody)
 	requestBody = ioutil.NopCloser(bytes.NewBuffer(s))
 	decoder := json.NewDecoder(requestBody)
-	var t *Request
+	var t *Reject
 	err := decoder.Decode(t)
 	if err != nil {
 		panic(err)

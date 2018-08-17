@@ -14,7 +14,7 @@ import (
 // It handles the threading, so queuing and notification process won't block the entire service
 type Worker struct {
 	DriverID       int
-	ready          bool
+	Ready          bool
 	isPrioritizing bool
 	isOffering     bool
 	isNotifying    bool
@@ -73,7 +73,7 @@ func NewWorker(driverID int) *Worker {
 	if workerList[getWorkerIndex(driverID)] == nil {
 		w := Worker{
 			DriverID:       driverID,
-			ready:          true,
+			Ready:          true,
 			isPrioritizing: false,
 			isOffering:     false,
 			isNotifying:    false,
@@ -91,11 +91,11 @@ func NewWorker(driverID int) *Worker {
 
 func (d Worker) startOfferingDriver() {
 	d.isOffering = true
-	for d.ready && len(d.orderQueue) > 0 {
+	for d.Ready && len(d.orderQueue) > 0 {
 		if d.isConfirming {
 			accepted := <-d.confirmChan
 			if accepted {
-				d.ready = false
+				d.Ready = false
 				d.orderQueue = nil
 				break
 			}
@@ -109,7 +109,7 @@ func (d Worker) startOfferingDriver() {
 			}
 			d.isNotifying = true
 		}
-		if !d.ready {
+		if !d.Ready {
 			d.orderQueue = nil
 		}
 	}
@@ -118,7 +118,7 @@ func (d Worker) startOfferingDriver() {
 }
 
 func (d Worker) queue(order order.Order) {
-	if d.ready {
+	if d.Ready {
 		if !d.isOffering {
 			go d.startOfferingDriver()
 		}
@@ -154,14 +154,14 @@ func (d Worker) insert(idx int, order order.Order) {
 
 func (d Worker) prioritize() {
 	d.isPrioritizing = true
-	for d.ready && len(d.orderPending) > 0 {
+	for d.Ready && len(d.orderPending) > 0 {
 		order := pop(d.pendingLock, &d.orderPending)
 		if len(d.orderQueue) == 0 {
 			d.insert(-1, order)
 		} else {
 			d.insert(findSmallerIndex(d.orderQueue, order), order)
 		}
-		if !d.ready {
+		if !d.Ready {
 			d.orderPending = nil
 		}
 	}
