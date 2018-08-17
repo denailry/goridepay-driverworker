@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"goridepay-driverworker/common"
-	"goridepay-driverworker/model"
+	"goridepay-driverworker/model/common"
+	"goridepay-driverworker/model/order"
+	"goridepay-driverworker/model/reject"
 	"goridepay-driverworker/worker"
 
 	"github.com/gorilla/mux"
@@ -21,27 +23,54 @@ import (
 var port = os.Args[1]
 
 func orderHandler(w http.ResponseWriter, r *http.Request) {
-	orderRequest := model.NewOrderRequest(r.Body)
-	orderInfo := model.OrderInfo{
-		OrderID:     orderRequest.OrderID,
-		Origin:      orderRequest.Origin,
-		Destination: orderRequest.Destination,
+	request := order.NewRequest(r.Body)
+	info := order.Info{
+		OrderID:     request.OrderID,
+		Origin:      request.Origin,
+		Destination: request.Destination,
 	}
-	for _, driverData := range orderRequest.DriverData {
-		o := model.Order{
-			Info:                &orderInfo,
+	for _, driverData := range request.DriverData {
+		o := order.Order{
+			Info:                &info,
 			OriginDistance:      driverData.OriginDistance,
 			DestinationDistance: driverData.DestinationDistance,
 		}
 		worker.AddOrder(driverData.DriverID, o)
 	}
-	or := model.OrderResponse{
+	response := response.Response{
 		Error:   false,
 		Message: "ok",
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(or.ToJSON())
+	w.Write(response.ToJSON())
+}
+
+func acceptHandler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func cancelHandler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func rejectHandler(w http.ResponseWriter, r *http.Request) {
+	request := reject.NewRequest(r.Body)
+	var re response.Response
+	if worker.RejectOrder(request.DriverID, request.OrderID) {
+		re.Error = false
+		re.Message = "ok"
+
+	} else {
+		re.Error = true
+		re.Message = "Order ID is not valid to be rejected"
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(re.ToJSON())
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func main() {
@@ -53,8 +82,11 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/order", orderHandler).Methods("POST")
+	r.HandleFunc("/accept", acceptHandler).Methods("POST")
+	r.HandleFunc("/cancel", cancelHandler).Methods("POST")
+	r.HandleFunc("/reject", rejectHandler).Methods("POST")
+	r.HandleFunc("/", homeHandler).Methods("GET")
 	http.Handle("/", r)
-	// Add your routes as needed
 
 	srv := &http.Server{
 		Addr: "0.0.0.0:" + port,

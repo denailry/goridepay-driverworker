@@ -2,7 +2,7 @@ package worker
 
 import (
 	"goridepay-driverworker/common"
-	"goridepay-driverworker/model"
+	"goridepay-driverworker/model/order"
 	"sync"
 	"time"
 )
@@ -15,10 +15,12 @@ type Worker struct {
 	DriverID       int
 	ready          bool
 	isPrioritizing bool
-	orderQueue     []*model.Order
-	orderPending   []*model.Order
+	orderQueue     []*order.Order
+	orderPending   []*order.Order
 	pendingLock    *sync.Mutex
 	queueLock      *sync.Mutex
+	rejectChannel  chan bool
+	previosOrderID int
 }
 
 // Always use getWorkerIndex to get element from workerList
@@ -29,12 +31,23 @@ func getWorkerIndex(driverID int) int {
 }
 
 // AddOrder is official way to add order to certain driver
-func AddOrder(driverID int, order model.Order) {
-	w := newWorker(driverID)
+func AddOrder(driverID int, order order.Order) {
+	w := NewWorker(driverID)
 	w.queue(order)
 }
 
-func newWorker(driverID int) *Worker {
+// RejectOrder is official way to reject order for certain driver
+func RejectOrder(driverID int, orderID int) bool {
+	w := NewWorker(driverID)
+	if orderID == w.previosOrderID {
+		w.rejectChannel <- true
+		return true
+	}
+	return false
+}
+
+// NewWorker return worker stored in workerList or create the new one if worker pointer is nil
+func NewWorker(driverID int) *Worker {
 	if workerList[getWorkerIndex(driverID)] == nil {
 		w := Worker{
 			DriverID:       driverID,
@@ -42,6 +55,8 @@ func newWorker(driverID int) *Worker {
 			isPrioritizing: false,
 			pendingLock:    &sync.Mutex{},
 			queueLock:      &sync.Mutex{},
+			rejectChannel:  make(chan bool),
+			previosOrderID: -1,
 		}
 		go w.startOfferingDriver()
 		return &w
@@ -52,14 +67,17 @@ func newWorker(driverID int) *Worker {
 func (d Worker) startOfferingDriver() {
 	for d.ready && len(d.orderQueue) > 0 {
 		go d.pushNotification()
-		time.Sleep(5000 * time.Millisecond)
+		select {
+		case <-d.rejectChannel:
+		case <-time.After(5000 * time.Millisecond):
+		}
 		if !d.ready {
 			d.orderQueue = nil
 		}
 	}
 }
 
-func (d Worker) queue(order model.Order) {
+func (d Worker) queue(order order.Order) {
 	if d.ready {
 		d.pendingLock.Lock()
 		d.orderPending = append(d.orderPending, &order)
@@ -70,7 +88,7 @@ func (d Worker) queue(order model.Order) {
 	}
 }
 
-func pop(lock *sync.Mutex, pq *[]*model.Order) model.Order {
+func pop(lock *sync.Mutex, pq *[]*order.Order) order.Order {
 	lock.Lock()
 	q := *pq
 	order := *q[0]
@@ -80,7 +98,7 @@ func pop(lock *sync.Mutex, pq *[]*model.Order) model.Order {
 	return order
 }
 
-func (d Worker) insert(idx int, order model.Order) {
+func (d Worker) insert(idx int, order order.Order) {
 	d.queueLock.Lock()
 	if idx == -1 {
 		d.orderQueue = append(d.orderQueue, &order)
@@ -107,7 +125,7 @@ func (d Worker) prioritize() {
 	d.isPrioritizing = false
 }
 
-func findSmallerIndex(q []*model.Order, o model.Order) int {
+func findSmallerIndex(q []*order.Order, o order.Order) int {
 	i := 0
 	result := -1
 	for result != -1 && i < len(q) {
@@ -122,6 +140,7 @@ func findSmallerIndex(q []*model.Order, o model.Order) int {
 }
 
 func (d Worker) pushNotification() {
-	// order := pop(&d.queueLock, &d.orderQueue)
+	order := pop(d.queueLock, &d.orderQueue)
 	// Push notification
+	d.previosOrderID = order.Info.OrderID
 }
