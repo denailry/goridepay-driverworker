@@ -1,13 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"goridepay-driverworker/common"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -15,41 +11,37 @@ import (
 	"strconv"
 	"time"
 
+	"goridepay-driverworker/common"
+	"goridepay-driverworker/model"
+	"goridepay-driverworker/worker"
+
 	"github.com/gorilla/mux"
 )
 
 var port = os.Args[1]
 
-type orderModel struct {
-	OrderID   string
-	DriverIds []string
-}
-
-type orderResponse struct {
-	Error   bool
-	Message string
-}
-
 func orderHandler(w http.ResponseWriter, r *http.Request) {
-	s, _ := ioutil.ReadAll(r.Body)
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(s))
-	fmt.Printf("--> %s\n\n", r.Body)
-	log.Println(s)
-	decoder := json.NewDecoder(r.Body)
-	var t orderModel
-	err := decoder.Decode(&t)
-	if err != nil {
-		panic(err)
+	orderRequest := model.NewOrderRequest(r.Body)
+	orderInfo := model.OrderInfo{
+		OrderID:     orderRequest.OrderID,
+		Origin:      orderRequest.Origin,
+		Destination: orderRequest.Destination,
 	}
-	log.Println("Order ID: " + t.DriverIds[0])
-	or := orderResponse{
+	for _, driverData := range orderRequest.DriverData {
+		o := model.Order{
+			Info:                &orderInfo,
+			OriginDistance:      driverData.OriginDistance,
+			DestinationDistance: driverData.DestinationDistance,
+		}
+		worker.AddOrder(driverData.DriverID, o)
+	}
+	or := model.OrderResponse{
 		false,
 		"ok",
 	}
-	rj, _ := json.Marshal(or)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(rj)
+	w.Write(or.ToJSON())
 }
 
 func main() {
