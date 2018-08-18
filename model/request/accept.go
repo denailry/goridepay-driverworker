@@ -18,10 +18,10 @@ func NewAccept(requestBody io.Reader) *Accept {
 	s, _ := ioutil.ReadAll(requestBody)
 	requestBody = ioutil.NopCloser(bytes.NewBuffer(s))
 	decoder := json.NewDecoder(requestBody)
-	var t *Accept
-	err := decoder.Decode(t)
+	var t Accept
+	err := decoder.Decode(&t)
 	if err != nil {
 		panic(err)
 	}
-	return t
+	return &t
 }

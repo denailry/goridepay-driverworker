@@ -17,10 +17,17 @@ func NewInvalidate(requestBody io.Reader) *Invalidate {
 	s, _ := ioutil.ReadAll(requestBody)
 	requestBody = ioutil.NopCloser(bytes.NewBuffer(s))
 	decoder := json.NewDecoder(requestBody)
-	var t *Invalidate
-	err := decoder.Decode(t)
+	var t Invalidate
+	err := decoder.Decode(&t)
 	if err != nil {
 		panic(err)
 	}
-	return t
+	return &t
+}
+
+// ToJSON will convert Invalidate to json
+// Later, it will also responsible to handling the json marshalling error
+func (d Invalidate) ToJSON() []byte {
+	result, _ := json.Marshal(d)
+	return result
 }

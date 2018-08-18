@@ -17,10 +17,10 @@ func NewSimple(requestBody io.Reader) *Simple {
 	s, _ := ioutil.ReadAll(requestBody)
 	requestBody = ioutil.NopCloser(bytes.NewBuffer(s))
 	decoder := json.NewDecoder(requestBody)
-	var t *Simple
-	err := decoder.Decode(t)
+	var t Simple
+	err := decoder.Decode(&t)
 	if err != nil {
 		panic(err)
 	}
-	return t
+	return &t
 }

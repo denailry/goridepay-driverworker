@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"log"
 )
 
 // Order is used to store data of request coming to orderHandler
@@ -26,11 +27,19 @@ type driverData struct {
 func NewOrder(requestBody io.Reader) *Order {
 	s, _ := ioutil.ReadAll(requestBody)
 	requestBody = ioutil.NopCloser(bytes.NewBuffer(s))
+	log.Println(requestBody)
 	decoder := json.NewDecoder(requestBody)
-	var t *Order
-	err := decoder.Decode(t)
+	var t Order
+	err := decoder.Decode(&t)
 	if err != nil {
 		panic(err)
 	}
-	return t
+	return &t
+}
+
+// ToJSON will convert Order to json
+// Later, it will also responsible to handling the json marshalling error
+func (d Order) ToJSON() []byte {
+	result, _ := json.Marshal(d)
+	return result
 }
