@@ -1,5 +1,23 @@
-Request to **/order**
+**GET** _/get-order-list?driverID=DRIVER_ID_
+```json
+[
+    {
+        "OrderID": 123,
+        "Origin": "Jl. Kelud Kiri Atas, Jatibening Baru",
+        "Destination": "Jl. Kelud Kanan Atas, Jatibening Baru",
+        "DestinationDistance": 2,
+        "OriginDistance": 3
+    },
+        {
+        "OrderID": 123,
+        "Origin": "Jl. Kelud Kiri Atas, Jatibening Baru",
+        "Destination": "Jl. Kelud Kanan Atas, Jatibening Baru",
+        "DestinationDistance": 2,
+        "OriginDistance": 3
+    }
+]
 
+**POST** _/order_
 ```json
 {
     "OrderID": 1,
@@ -26,5 +44,12 @@ Request to **/order**
                 "OriginDistance": 9
             }
         ]
+}
+```
+
+**POST** _/invalidate_
+```json
+{
+    "OrderID": 1
 }
 ```

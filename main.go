@@ -27,17 +27,18 @@ var port = os.Args[1]
 
 func orderHandler(w http.ResponseWriter, r *http.Request) {
 	request := request.NewOrder(r.Body)
+
 	info := order.Info{
-		OrderID:     request.OrderID,
-		Origin:      request.Origin,
-		Destination: request.Destination,
-		Timestamp:   time.Now().Unix(),
+		OrderID:             request.OrderID,
+		Origin:              request.Origin,
+		Destination:         request.Destination,
+		Timestamp:           time.Now().Unix(),
+		DestinationDistance: request.DestinationDistance,
 	}
 	for _, driverData := range request.DriverData {
 		o := order.Order{
-			Info:                &info,
-			OriginDistance:      driverData.OriginDistance,
-			DestinationDistance: driverData.DestinationDistance,
+			Info:           &info,
+			OriginDistance: driverData.OriginDistance,
 		}
 		worker.AddOrder(driverData.DriverID, o)
 	}
@@ -50,35 +51,19 @@ func orderHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(response.ToJSON())
 }
 
-func acceptHandler(w http.ResponseWriter, r *http.Request) {
-	request := request.NewAccept(r.Body)
-	var re response.Simple
-	if worker.AcceptOrder(request.DriverID, request.OrderID) {
-		re.Error = false
-		re.Message = "ok"
-	} else {
-		re.Error = true
-		re.Message = "Order has been taken or cancelled."
-	}
-	w.WriteHeader(http.StatusOK)
-	w.Write(re.ToJSON())
-}
-
-func readyHandler(w http.ResponseWriter, r *http.Request) {
-	request := request.NewSimple(r.Body)
-	worker := worker.NewWorker(request.DriverID)
-	var re response.Simple
-	if worker.Ready {
-		re.Error = true
-		re.Message = "Worker is already in ready state"
-	} else {
-		re.Error = false
-		re.Message = "ok"
-		worker.Ready = true
-	}
-	w.WriteHeader(http.StatusOK)
-	w.Write(re.ToJSON())
-}
+// func acceptHandler(w http.ResponseWriter, r *http.Request) {
+// 	request := request.NewAccept(r.Body)
+// 	var re response.Simple
+// 	if worker.AcceptOrder(request.DriverID, request.OrderID) {
+// 		re.Error = false
+// 		re.Message = "ok"
+// 	} else {
+// 		re.Error = true
+// 		re.Message = "Order has been taken or cancelled."
+// 	}
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write(re.ToJSON())
+// }
 
 func invalidateHandler(w http.ResponseWriter, r *http.Request) {
 	request := request.NewInvalidate(r.Body)
@@ -92,18 +77,17 @@ func invalidateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(re.ToJSON())
 }
 
-func rejectHandler(w http.ResponseWriter, r *http.Request) {
-	request := request.NewReject(r.Body)
-	var re response.Simple
-	if worker.RejectOrder(request.DriverID, request.OrderID) {
-		re.Error = false
-		re.Message = "ok"
+func getOrderListHandler(w http.ResponseWriter, r *http.Request) {
+	driverID := r.FormValue("driverID")
+	id, err := strconv.Atoi(driverID)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
 	} else {
-		re.Error = true
-		re.Message = "Order ID is not valid to be rejected."
+		orderList := worker.GetOrderList(id)
+		re := response.NewOrderList(orderList)
+		w.WriteHeader(http.StatusOK)
+		w.Write(re.ToJSON())
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write(re.ToJSON())
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -120,10 +104,8 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/order", orderHandler).Methods("POST")
-	r.HandleFunc("/accept", acceptHandler).Methods("POST")
-	r.HandleFunc("/ready", readyHandler).Methods("POST")
-	r.HandleFunc("/reject", rejectHandler).Methods("POST")
-	r.HandleFunc("/invalidate", rejectHandler).Methods("POST")
+	r.HandleFunc("/invalidate", invalidateHandler).Methods("POST")
+	r.HandleFunc("/get-order-list", getOrderListHandler).Methods("GET")
 	r.HandleFunc("/", homeHandler).Methods("GET")
 	http.Handle("/", r)
 
