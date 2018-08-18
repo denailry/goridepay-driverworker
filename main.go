@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -16,6 +15,7 @@ import (
 	"goridepay-driverworker/common"
 	"goridepay-driverworker/invalidator"
 	"goridepay-driverworker/model/invalidate"
+	"goridepay-driverworker/model/order"
 	"goridepay-driverworker/model/request"
 	"goridepay-driverworker/model/response"
 	"goridepay-driverworker/worker"
@@ -26,34 +26,22 @@ import (
 var port = os.Args[1]
 
 func orderHandler(w http.ResponseWriter, r *http.Request) {
-	// s, _ := ioutil.ReadAll(r.Body)
-	// requestBody := ioutil.NopCloser(bytes.NewBuffer(s))
-	// log.Println(requestBody)
-	// request := request.NewOrder(r.Body)
-	// log.Println(request.ToJSON())
-	// info := order.Info{
-	// 	OrderID:             request.OrderID,
-	// 	Origin:              request.Origin,
-	// 	Destination:         request.Destination,
-	// 	Timestamp:           time.Now().Unix(),
-	// 	DestinationDistance: request.DestinationDistance,
-	// }
-	// for _, driverData := range request.DriverData {
-	// 	o := order.Order{
-	// 		Info:           &info,
-	// 		OriginDistance: driverData.OriginDistance,
-	// 	}
-	// 	worker.AddOrder(driverData.DriverID, o)
-	// }
-	// decoder := json.NewDecoder(r.Body)
-	// var t test_struct
-	// err := decoder.Decode(&t)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	t := request.NewOrder(r.Body)
-	result, _ := json.Marshal(t)
-	log.Println(string(result[:]))
+	request := request.NewOrder(r.Body)
+	log.Println(string(request.ToJSON()[:]))
+	info := order.Info{
+		OrderID:             request.OrderID,
+		Origin:              request.Origin,
+		Destination:         request.Destination,
+		Timestamp:           time.Now().Unix(),
+		DestinationDistance: request.DestinationDistance,
+	}
+	for _, driverData := range request.DriverData {
+		o := order.Order{
+			Info:           &info,
+			OriginDistance: driverData.OriginDistance,
+		}
+		worker.AddOrder(driverData.DriverID, o)
+	}
 
 	response := response.Simple{
 		Error:   false,
@@ -80,7 +68,7 @@ func orderHandler(w http.ResponseWriter, r *http.Request) {
 
 func invalidateHandler(w http.ResponseWriter, r *http.Request) {
 	request := request.NewInvalidate(r.Body)
-	log.Println(request.ToJSON())
+	log.Println(string(request.ToJSON()[:]))
 	invalidOrder := invalidate.NewInvalidOrder(request.OrderID)
 	go invalidator.Invalidate(invalidOrder)
 	re := response.Simple{

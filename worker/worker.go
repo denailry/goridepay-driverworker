@@ -1,9 +1,11 @@
 package worker
 
 import (
+	"fmt"
 	"goridepay-driverworker/common"
 	"goridepay-driverworker/invalidator"
 	"goridepay-driverworker/model/order"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -80,6 +82,7 @@ func AddOrder(driverID int, order order.Order) {
 // NewWorker return worker stored in workerList or create the new one if worker pointer is nil
 func NewWorker(driverID int) *Worker {
 	if workerList[getWorkerIndex(driverID)] == nil {
+		fmt.Println("Create new driver with ID " + strconv.Itoa(driverID))
 		w := Worker{
 			DriverID:       driverID,
 			isPrioritizing: false,
@@ -93,8 +96,10 @@ func NewWorker(driverID int) *Worker {
 			confirmChan:    make(chan bool),
 			previosOrderID: -1,
 		}
+		workerList[getWorkerIndex(driverID)] = &w
 		return &w
 	}
+	fmt.Println("Return instance driver with ID " + strconv.Itoa(driverID))
 	return workerList[getWorkerIndex(driverID)]
 }
 
@@ -122,7 +127,7 @@ func NewWorker(driverID int) *Worker {
 // 	d.isOffering = false
 // }
 
-func (d Worker) queue(order order.Order) {
+func (d *Worker) queue(order order.Order) {
 	// if !d.isOffering {
 	// 	go d.startOfferingDriver()
 	// }
@@ -132,38 +137,40 @@ func (d Worker) queue(order order.Order) {
 	if !d.isPrioritizing {
 		go d.prioritize()
 	}
+	if !d.isCleaning {
+		go d.runCleaner()
+	}
 }
 
 func pop(lock *sync.Mutex, pq *[]*order.Order) order.Order {
 	lock.Lock()
-	q := *pq
-	order := *q[0]
-	temp := q[1:]
-	pq = &temp
+	order := *(*pq)[0]
+	*pq = (*pq)[1:]
 	lock.Unlock()
 	return order
 }
 
-func (d Worker) insert(idx int, order order.Order) {
+func (d *Worker) insert(idx int, o order.Order) {
 	d.queueLock.Lock()
 	if idx >= len(d.orderQueue) {
-		d.orderQueue = append(d.orderQueue, &order)
+		fmt.Println("Length before append in queue of " + strconv.Itoa(d.DriverID) + " is " + strconv.Itoa(len(d.orderQueue)))
+		d.orderQueue = append(d.orderQueue, &o)
+		fmt.Println("Length after append in queue of " + strconv.Itoa(d.DriverID) + " is " + strconv.Itoa(len(d.orderQueue)))
+		fmt.Println("Appended new element in queue of " + strconv.Itoa(d.DriverID))
 	} else {
-		temp := append(d.orderQueue[:idx], &order)
-		d.orderQueue = append(temp, d.orderQueue[idx:]...)
+		d.orderQueue = append(d.orderQueue[:idx], append([]*order.Order{&o}, d.orderQueue[idx:]...)...)
+		fmt.Println("Inserted new element in queue of " + strconv.Itoa(d.DriverID) +
+			" at index " + strconv.Itoa(idx))
 	}
 	d.queueLock.Unlock()
 }
 
-func (d Worker) prioritize() {
+func (d *Worker) prioritize() {
 	d.isPrioritizing = true
 	for len(d.orderPending) > 0 {
 		order := pop(d.pendingLock, &d.orderPending)
-		if len(d.orderQueue) == 0 {
-			d.insert(-1, order)
-		} else {
-			d.insert(findSmallerIndex(d.orderQueue, order), order)
-		}
+		d.insert(findSmallerIndex(d.orderQueue, order), order)
+		fmt.Println("Worker of " + strconv.Itoa(d.DriverID) + " has queue length " + strconv.Itoa(len(d.orderQueue)))
 	}
 	d.isPrioritizing = false
 }
@@ -171,9 +178,11 @@ func (d Worker) prioritize() {
 func findSmallerIndex(q []*order.Order, o order.Order) int {
 	i := len(q) - 1
 	result := -1
-	for result != -1 && i >= 0 {
+	for result == -1 && i >= 0 {
+		fmt.Println("Iter " + strconv.Itoa(i))
 		c := *q[i]
 		if c.OriginDistance < o.OriginDistance {
+			fmt.Println("Choose " + strconv.Itoa(i))
 			result = i
 		} else {
 			i--
@@ -193,11 +202,11 @@ func findSmallerIndex(q []*order.Order, o order.Order) int {
 // }
 
 func isValid(orderInfo order.Info) bool {
-	return orderInfo.Timestamp-time.Now().Unix() < common.MaxOrderWaitingTime &&
+	return time.Now().Unix()-orderInfo.Timestamp < common.MaxOrderWaitingTime &&
 		invalidator.IsValid(orderInfo.OrderID)
 }
 
-func (d Worker) runCleaner() {
+func (d *Worker) runCleaner() {
 	d.isCleaning = true
 	for len(d.orderQueue) > 0 {
 		d.queueLock.Lock()
@@ -212,10 +221,16 @@ func clean(q *[]*order.Order) {
 	i := 0
 	for i < len(*q) {
 		order := (*q)[i]
-		if isValid(*order.Info) {
+		if !isValid(*order.Info) {
 			(*q) = append((*q)[:i], (*q)[i+1:]...)
 		} else {
 			i++
 		}
+	}
+}
+
+func printlist(list []*order.Order) {
+	for _, data := range list {
+		fmt.Println(data.Info.OrderID)
 	}
 }
