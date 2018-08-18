@@ -9,16 +9,17 @@ import (
 
 // Order is used to store data of request coming to orderHandler
 type Order struct {
-	OrderID     int
-	Origin      string
-	Destination string
-	DriverData  []driverData
+	OrderID             int
+	Origin              string
+	Destination         string
+	DestinationDistance int
+	TransactionID       int
+	DriverData          []driverData
 }
 
 type driverData struct {
-	DriverID            int
-	OriginDistance      int
-	DestinationDistance int
+	DriverID       int
+	OriginDistance int
 }
 
 // NewOrder is constructor of request.Order which converts request body coming to orderHandler to request.Order
