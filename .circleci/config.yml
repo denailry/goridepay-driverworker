@@ -25,22 +25,21 @@ jobs:
       - checkout
       - run:
           name: Deploy Master to Heroku
-          command:
-            - |
-              cat >~/.netrc <<EOF
-              machine api.heroku.com
-                login $HEROKU_EMAIL
-                password $HEROKU_API_KEY
-              machine registry.heroku.com
-                login $HEROKU_EMAIL
-                password $HEROKU_API_KEY
-              EOF
-            - chmod 600 ~/.netrc
-            - "[[ ! -s \"$(git rev-parse --git-dir)/shallow\" ]] || git fetch --unshallow"
-            - docker login --username=$HEROKU_EMAIL --password=$HEROKU_API_KEY registry.heroku.com
-            - docker build --rm=false -t registry.heroku.com/goridepay-driverworker/web .
-            - heroku container:push web --app goridepay-driverworker
-            - heroku container:release web --app goridepay-driverworker
+          command: |
+            cat >~/.netrc <<EOF
+            machine api.heroku.com
+              login $HEROKU_EMAIL
+              password $HEROKU_API_KEY
+            machine registry.heroku.com
+              login $HEROKU_EMAIL
+              password $HEROKU_API_KEY
+            EOF
+            chmod 600 ~/.netrc
+            "[[ ! -s \"$(git rev-parse --git-dir)/shallow\" ]] || git fetch --unshallow"
+            docker login --username=$HEROKU_EMAIL --password=$HEROKU_API_KEY registry.heroku.com
+            docker build --rm=false -t registry.heroku.com/goridepay-driverworker/web .
+            heroku container:push web --app goridepay-driverworker
+            heroku container:release web --app goridepay-driverworker
 
 workflows:
   version: 2
