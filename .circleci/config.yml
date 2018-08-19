@@ -8,7 +8,7 @@ jobs:
   deploy:
     machine:
         enabled: true
-    working_directory: ~/circleci-demo-workflows
+    working_directory: ~/Documents/sea/go-project/src/goridepay-driverworker
     environment:
       HEROKU_APP: "goridepay-driverworker"
     steps:
