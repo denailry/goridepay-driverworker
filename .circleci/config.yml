@@ -5,7 +5,42 @@ jobs:
     steps:
       - checkout
       - run: docker build -t denailry/goridepay-driverworker:latest .
-      - run: |
-          docker login --username=$HEROKU_EMAIL --password=$HEROKU_API_KEY registry.heroku.com
-          docker build --rm=false -t registry.heroku.com/goridepay-driverworker/web .
-          docker push registry.heroku.com/goridepay-driverworker/web:latest
+  deploy:
+    machine:
+        enabled: true
+    working_directory: ~/circleci-demo-workflows
+    environment:
+      HEROKU_APP: "goridepay-driverworker"
+    steps:
+      - checkout
+      - run:
+          name: Deploy Master to Heroku
+          commands:
+            - |
+              cat >~/.netrc <<EOF
+              machine api.heroku.com
+                login $HEROKU_EMAIL
+                password $HEROKU_TOKEN
+              machine git.heroku.com
+                login $HEROKU_EMAIL
+                password $HEROKU_TOKEN
+              EOF
+            - chmod 600 ~/.netrc # Heroku cli complains about permissions without this
+            - "[[ ! -s \"$(git rev-parse --git-dir)/shallow\" ]] || git fetch --unshallow"
+            - docker login --username=$HEROKU_EMAIL --password=$HEROKU_API_KEY registry.heroku.com
+            - docker build --rm=false -t registry.heroku.com/goridepay-driverworker/web .
+            - docker push registry.heroku.com/goridepay-driverworker/web:latest
+            - heroku container:release web --app goridepay-driverworker:
+                timeout: 400 # if your deploys take a long time
+
+workflows:
+  version: 2
+  build-and-deploy:
+    jobs:
+      - build
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only: sequential-branch-filter
