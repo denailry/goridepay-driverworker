@@ -37,8 +37,7 @@ jobs:
             chmod 600 ~/.netrc
             docker login --username=$HEROKU_EMAIL --password=$HEROKU_API_KEY registry.heroku.com
             docker build --rm=false -t registry.heroku.com/goridepay-driverworker/web .
-            heroku container:push web --app goridepay-driverworker
-            heroku container:release web --app goridepay-driverworker
+            heroku container:push release --app goridepay-driverworker
 
 workflows:
   version: 2
