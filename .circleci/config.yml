@@ -6,10 +6,7 @@ jobs:
       - checkout
       - run: docker build -t denailry/goridepay-driverworker:latest .
       - run: docker push company/app:$CIRCLE_BRANCH
-  deployment:
-    staging:
-      branch: master
-      commands:
-        - docker login --email=$HEROKU_EMAIL --password=$HEROKU_API_KEY registry.heroku.com
-        - docker build --rm=false -t registry.heroku.com/goridepay-driverworker/web .
-        - docker push registry.heroku.com/goridepay-driverworker/web:latest
+      - run: |
+          docker login --email=$HEROKU_EMAIL --password=$HEROKU_API_KEY registry.heroku.com
+          docker build --rm=false -t registry.heroku.com/goridepay-driverworker/web .
+          docker push registry.heroku.com/goridepay-driverworker/web:latest
