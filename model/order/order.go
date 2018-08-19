@@ -1,5 +1,9 @@
 package order
 
+import (
+	"strconv"
+)
+
 // Order is official type to store data needed by Worker
 type Order struct {
 	Info           *Info
@@ -15,4 +19,15 @@ type Info struct {
 	Destination         string
 	Timestamp           int64
 	DestinationDistance int
+}
+
+// ToString creates readable string of Order
+func (o Order) ToString() string {
+	originDistance := "OriginDistance: " + strconv.Itoa(o.OriginDistance)
+	orderID := "OrderID: " + strconv.Itoa(o.Info.OrderID)
+	timestamp := "Timestamp: " + strconv.FormatInt(o.Info.Timestamp, 10)
+	destinationDistance := "DestinationDistance: " + strconv.Itoa(o.Info.DestinationDistance)
+	origin := "Origin: " + o.Info.Origin
+	destination := "Destination: " + o.Info.Destination
+	return "{" + orderID + "," + originDistance + "," + destinationDistance + "," + origin + "," + destination + "," + timestamp + "}"
 }
